@@ -19,6 +19,10 @@
           ]
         }
       },
+      "synonym": {
+          "type": "synonym",
+          "synonyms_path": "synonyms.csv"
+      },
       "filter": {
         "smarter_hyphens_filter": {
           "type": "word_delimiter_graph",

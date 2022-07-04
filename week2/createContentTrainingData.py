@@ -6,10 +6,11 @@ import os
 import random
 import xml.etree.ElementTree as ET
 from pathlib import Path
-
+from nltk.stem import SnowballStemmer
+stemmer = SnowballStemmer("english")
 def transform_name(product_name):
     # IMPLEMENT
-    return product_name
+    return stemmer.stem(product_name)
 
 # Directory for product data
 directory = r'/workspace/datasets/product_data/products/'
