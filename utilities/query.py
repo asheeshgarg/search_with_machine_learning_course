@@ -11,11 +11,14 @@ from urllib.parse import urljoin
 import pandas as pd
 import fileinput
 import logging
-
+import numpy as np
+import fasttext
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logging.basicConfig(format='%(levelname)s:%(message)s')
+
+cat_model = fasttext.load_model("../week3/cat_classifier.bin")
 
 # expects clicks and impressions to be in the row
 def create_prior_queries_from_group(
@@ -49,7 +52,17 @@ def create_prior_queries(doc_ids, doc_id_weights,
 
 
 # Hardcoded query here.  Better to use search templates or other query config.
-def create_query(user_query, click_prior_query, filters, sort="_score", sortDir="desc", size=10, source=None):
+def create_query(user_query, click_prior_query, filters, sort="_score", sortDir="desc", size=10, source=None,use_synonyms=False,use_cat_filter=False):
+    pred = cat_model.predict(user_query, k=20)
+    scores = pred[1]
+    # pred_cats = max(1, np.argmin(scores > 0.1)) ## use only cats with score more thatn 0.25
+    # try summing the scores of the top categories returned by the classifier until their sum is above the threshold
+    # pred_cats = 5
+    num_cats = np.argmin(np.cumsum(scores) < 0.5)
+    pred_cats = num_cats if num_cats > 1 else 1
+    category = pred[0][0:pred_cats]
+    cats_list = [cat.replace('__label__', '') for cat in category]
+    print(f"pred cat list: {cats_list}")
     query_obj = {
         'size': size,
         "sort": [
@@ -167,6 +180,23 @@ def create_query(user_query, click_prior_query, filters, sort="_score", sortDir=
             }
         }
     }
+    if use_cat_filter and len(cats_list) > 0:
+        cats_filter = {
+            "terms": {
+                "categoryPathIds": cats_list
+            }
+        }
+        query_obj["query"]["function_score"]["query"]["bool"]["must"].append(cats_filter)
+    if use_synonyms:
+        synonym_match = {
+            "match": {
+                "name.synonyms": {
+                    "query": user_query,
+                    "operator": "OR"
+                }
+            }
+        }
+        query_obj["query"]["function_score"]["query"]["bool"]["should"].append(synonym_match)
     if click_prior_query is not None and click_prior_query != "":
         query_obj["query"]["function_score"]["query"]["bool"]["should"].append({
             "query_string": {
@@ -183,20 +213,24 @@ def create_query(user_query, click_prior_query, filters, sort="_score", sortDir=
             print("Couldn't replace query for *")
     if source is not None:  # otherwise use the default and retrieve all source
         query_obj["_source"] = source
+
     return query_obj
 
 
-def search(client, user_query, index="bbuy_products", sort="_score", sortDir="desc"):
+def search(client, user_query, index="bbuy_products", sort="_score", sortDir="desc",use_synonyms=False,use_cat_filter=False):
     #### W3: classify the query
     #### W3: create filters and boosts
     # Note: you may also want to modify the `create_query` method above
-    query_obj = create_query(user_query, click_prior_query=None, filters=None, sort=sort, sortDir=sortDir, source=["name", "shortDescription"])
+    query_obj = create_query(user_query, click_prior_query=None, filters=None, sort=sort, sortDir=sortDir, source=["name", "shortDescription"], use_synonyms=use_synonyms,use_cat_filter=use_cat_filter)
     logging.info(query_obj)
     response = client.search(query_obj, index=index)
     if response and response['hits']['hits'] and len(response['hits']['hits']) > 0:
         hits = response['hits']['hits']
         print(json.dumps(response, indent=2))
-
+        for hit in hits:
+            print(f"{hit['_source']['name'][0]}")
+    else:
+        print(f"response_len:{len(response['hits']['hits'])}")
 
 if __name__ == "__main__":
     host = 'localhost'
