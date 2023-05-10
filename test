@@ -1,0 +1,61 @@
+def arrowForMostTargets(size, targets):
+    ARROW_DIRS = ["A", "B", "C", "D", "E", "F", "G", "H"]
+    max_targets = 0
+    best_pos = ""
+    best_dir = ""
+
+    for row in range(size):
+        for col in range(size):
+            if row == 0 or col == 0 or row == size - 1 or col == size - 1:
+                for arrow in ARROW_DIRS:
+                    targets_hit = count_targets_hit(size, targets, row, col, arrow)
+                    if targets_hit > max_targets:
+                        max_targets = targets_hit
+                        best_pos = f"{row}{col}"
+                        best_dir = arrow
+                    elif targets_hit == max_targets:
+                        current = f"{row}{col}{arrow}"
+                        if current < f"{best_pos}{best_dir}":
+                            best_pos = f"{row}{col}"
+                            best_dir = arrow
+
+    return f"{best_pos}{best_dir}"
+
+
+def count_targets_hit(size, targets, row, col, arrow):
+    delta_row, delta_col = get_arrow_direction(arrow)
+    cur_row, cur_col = row + delta_row, col + delta_col
+    targets_hit = 0
+
+    while 0 <= cur_row < size and 0 <= cur_col < size:
+        if f"{cur_row}{cur_col}" in targets:
+            targets_hit += 1
+        else:
+            break
+
+        cur_row += delta_row
+        cur_col += delta_col
+
+    return targets_hit
+
+
+def get_arrow_direction(arrow):
+    if arrow == "A":
+        return 0, -1
+    elif arrow == "B":
+        return -1, 0
+    elif arrow == "C":
+        return 0, 1
+    elif arrow == "D":
+        return 1, 0 
+    elif arrow == "E":
+        return -1, -1
+    elif arrow == "F":
+        return -1, 1
+    elif arrow == "G":
+        return 1, 1
+    elif arrow == "H":
+        return 1, -1
+size= 8
+targets= "65 45 55 32 42 54 13 14 41 61 24"
+arrowForMostTargets(size,targets)
